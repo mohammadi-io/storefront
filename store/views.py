@@ -4,16 +4,19 @@ from django.db.models.aggregates import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import api_view, APIView
 from rest_framework import status
+from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.filters import SearchFilter, OrderingFilter
-from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin
+from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, ListModelMixin, RetrieveModelMixin, \
+    UpdateModelMixin
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 from .filters import ProductFilter
 from .models import Cart, CartItem, Collection, Customer, OrderItem, Product, Review
 from .pagination import DefaultPagination
-from .serializers import CartSerializer, CartItemSerializer, CollectionSerializer, CustomerSerializer, ReviewSerializer, ProductSerializer
+from .serializers import CartSerializer, CartItemSerializer, CollectionSerializer, CustomerSerializer, ReviewSerializer, \
+    ProductSerializer
 
 
 # Create your views here.
@@ -31,6 +34,7 @@ class ProductViewSet(ModelViewSet):  # Merge of ProductList & ProductDetail
     ordering_fields = ['unit_price', 'last_update']
     # pagination_class = PageNumberPagination  # we set the page size in settings.py
     pagination_class = DefaultPagination  # we use this to not set page_size globally or supress the warning
+
     # def get_queryset(self):  # we use the function since we have a filtering logic on queryset
     #     queryset = Product.objects.all()
     #     collection_id = self.request.query_params.get('collection_id')
@@ -249,7 +253,8 @@ class CartViewSet(CreateModelMixin,
                   DestroyModelMixin,
                   RetrieveModelMixin,
                   GenericViewSet):  # we have only the creation part
-    queryset = Cart.objects.prefetch_related('items__product').all()   # eager loads items + products, prevent extra queries
+    queryset = Cart.objects.prefetch_related(
+        'items__product').all()  # eager loads items + products, prevent extra queries
     serializer_class = CartSerializer
 
 
@@ -264,3 +269,22 @@ class CartItemViewSet(ModelViewSet):
 class CustomerViewSet(CreateModelMixin, RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
+
+    @action(methods=['GET', 'PUT'], detail=False)  # when the detail is False, it will be available on list
+    def me(self, request):
+        # This returns a tuple that we unpacked. created==True if the object not exists
+        # (customer, created) = Customer.objects.get_or_create(user_id=request.user.id)
+        # Above approach has this problem that it cannot create a new customer without of Customer 1o1 relation
+        customer = get_object_or_404(klass=Customer, user_id=request.user.id)
+        # Auth middleware adds user to the request
+        if request.method == 'GET':
+            serializer = CustomerSerializer(customer)
+            return Response(serializer.data)  # If it is an AnonymousUser user_id = None
+            # When we use Response it is returned as a browsable API
+        elif request.method == 'PUT':
+            #  if we don't put customer as input
+            #  we get duplicate key value violates unique constraint "store_customer_user_id_key"
+            serializer = CustomerSerializer(customer, data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
