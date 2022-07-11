@@ -18,7 +18,7 @@ from .models import Cart, CartItem, Collection, Customer, OrderItem, Product, Re
 from .pagination import DefaultPagination
 from .serializers import CartSerializer, CartItemSerializer, CollectionSerializer, CustomerSerializer, ReviewSerializer, \
     ProductSerializer
-
+from .permissions import IsAdminOrReadOnly
 
 # Create your views here.
 
@@ -35,6 +35,7 @@ class ProductViewSet(ModelViewSet):  # Merge of ProductList & ProductDetail
     ordering_fields = ['unit_price', 'last_update']
     # pagination_class = PageNumberPagination  # we set the page size in settings.py
     pagination_class = DefaultPagination  # we use this to not set page_size globally or supress the warning
+    permission_classes = [IsAdminOrReadOnly]
 
     # def get_queryset(self):  # we use the function since we have a filtering logic on queryset
     #     queryset = Product.objects.all()
@@ -168,6 +169,7 @@ class ProductDetail(RetrieveUpdateDestroyAPIView):
 class CollectionViewSet(ModelViewSet):  # ReadOnlyModelViewSet for only reading not updating
     queryset = Collection.objects.annotate(products_count=Count('product'))
     serializer_class = CollectionSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
     def destroy(self, request, *args, **kwargs):
         if Product.objects.filter(collection_id=kwargs['pk']).count() > 0:
