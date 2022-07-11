@@ -4,6 +4,7 @@ from django.db.models.aggregates import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import api_view, APIView
 from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -269,6 +270,13 @@ class CartItemViewSet(ModelViewSet):
 class CustomerViewSet(CreateModelMixin, RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
+    # We can also set permission globally in settings.py
+    permission_classes = [IsAuthenticated]  # if any of the permissions fails, then unauthorized
+
+    def get_permissions(self):  # custom permission for each method
+        if self.request.method == 'GET':
+            return [AllowAny()]  # Pay attention that we return an instance not the class
+        return [IsAuthenticated()]
 
     @action(methods=['GET', 'PUT'], detail=False)  # when the detail is False, it will be available on list
     def me(self, request):
